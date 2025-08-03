@@ -1,0 +1,31 @@
+# Python cache and environment
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.env
+.env
+*.venv
+.venv/
+
+# VSCode
+.vscode/
+
+# Jupyter and notebook checkpoints
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+
+# PDF and data files (if you don't want to push them)
+*.pdf
+*.csv
+
+# API keys and secrets
+OPENAI_API_KEY
+*.secret
+*.key
+
+# Misc
+*.log
+*.tmp
