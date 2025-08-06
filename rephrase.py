@@ -1,5 +1,7 @@
+
 import torch
 import os
+import argparse
 from sentence_transformers import SentenceTransformer
 import faiss
 from openai import OpenAI
@@ -20,30 +22,48 @@ def search_similar_sentences(user_sentence, model, index, sentences, k=3):
     return similar_sentences
 
 # --- ステップ2: LLMによるリライト生成 ---
-def generate_rephrase(original_sentence, similar_sentences):
+def generate_rephrase(original_sentence, similar_sentences, lang_hint=None):
     client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-    prompt = f"""
-    あなたは学術論文の専門エディターです。
-    以下の「元の文」を、分野の専門家が書いたような、より洗練された自然な学術的表現に書き換えてください。
+    if lang_hint == "en":
+        prompt = f"""
+You are an expert academic editor. Rewrite the following sentence in three different, sophisticated, and natural academic English styles, referencing the style and vocabulary of the provided top paper examples. Do not copy-paste, but keep the core meaning and key entities/claims.
 
-    制約条件:
-    - 「元の文」の核心的な意味（キーエンティティ、主張）は絶対に維持してください。
-    - 以下の「参考文」のスタイルや語彙を参考にしてください。ただし、単なるコピー＆ペーストは避けてください。
-    - 3つの異なる表現を提案してください。
+---
+# Original sentence:
+{original_sentence}
 
-    ---
-    # 元の文:
-    {original_sentence}
+# Reference sentences (from top papers):
+- {similar_sentences[0].strip()}
+- {similar_sentences[1].strip()}
+- {similar_sentences[2].strip()}
+---
 
-    # 参考文 (この分野のトップ論文の表現例):
-    - {similar_sentences[0].strip()}
-    - {similar_sentences[1].strip()}
-    - {similar_sentences[2].strip()}
-    ---
+# Suggestions:
+1.
+"""
+    else:
+        prompt = f"""
+あなたは学術論文の専門エディターです。
+以下の「元の文」を、分野の専門家が書いたような、より洗練された自然な学術的表現に書き換えてください。
 
-    # 提案:
-    1. 
-    """
+制約条件:
+- 「元の文」の核心的な意味（キーエンティティ、主張）は絶対に維持してください。
+- 以下の「参考文」のスタイルや語彙を参考にしてください。ただし、単なるコピー＆ペーストは避けてください。
+- 3つの異なる表現を提案してください。
+
+---
+# 元の文:
+{original_sentence}
+
+# 参考文 (この分野のトップ論文の表現例):
+- {similar_sentences[0].strip()}
+- {similar_sentences[1].strip()}
+- {similar_sentences[2].strip()}
+---
+
+# 提案:
+1. 
+"""
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": prompt}],
@@ -53,19 +73,51 @@ def generate_rephrase(original_sentence, similar_sentences):
     )
     return response.choices[0].message.content
 
+# --- 自動英訳機能 ---
+def translate_to_english(text):
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+    prompt = f"""
+Translate the following academic sentence to natural, sophisticated English suitable for a scientific paper. Only output the translation.
+---
+{text}
+---
+"""
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3,
+        max_tokens=120,
+        n=1
+    )
+    return response.choices[0].message.content.strip()
+
 # --- テスト例 ---
+
 if __name__ == "__main__":
     # extractText.py で作成したモデル・インデックス・文リストをimportする例
     from extractText import model, index, all_sentences
 
-    user_draft_sentence = "To solve this problem, we developed a new method."  # 例
-    similar_sentences = search_similar_sentences(user_draft_sentence, model, index, all_sentences, k=3)
-    print("Found similar sentences from corpus:")
-    for sent in similar_sentences:
-        print(f"- {sent.strip()}")
+    parser = argparse.ArgumentParser(description="Corpus-powered rephraser with auto-translation option.")
+    parser.add_argument("--sentence", type=str, help="Draft sentence to rephrase.")
+    parser.add_argument("--auto-translate", action="store_true", help="If set, auto-translate Japanese input to English and rephrase using English corpus.")
+    args = parser.parse_args()
 
-    # リライト案生成
-    rephrased_suggestions = generate_rephrase(user_draft_sentence, similar_sentences)
+    if args.sentence:
+        user_draft_sentence = args.sentence.strip()
+    else:
+        user_draft_sentence = input("Enter your draft sentence: ").strip()
+
+    if args.auto_translate:
+        # 日本語→英語自動翻訳
+        print("Translating to English...")
+        en_sentence = translate_to_english(user_draft_sentence)
+        print(f"[English translation] {en_sentence}")
+        similar_sentences = search_similar_sentences(en_sentence, model, index, all_sentences, k=3)
+        rephrased_suggestions = generate_rephrase(en_sentence, similar_sentences, lang_hint="en")
+    else:
+        similar_sentences = search_similar_sentences(user_draft_sentence, model, index, all_sentences, k=3)
+        rephrased_suggestions = generate_rephrase(user_draft_sentence, similar_sentences)
+
     print("\n--- AI-Generated Rephrasing Suggestions ---")
     print(rephrased_suggestions)
 
