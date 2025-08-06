@@ -1,8 +1,11 @@
+
 import fitz  # PyMuPDF
 import re
 from sentence_transformers import SentenceTransformer
 import faiss
 import numpy as np
+import glob
+import os
 
 def extract_text_from_pdf(pdf_path):
     doc = fitz.open(pdf_path)
@@ -54,7 +57,11 @@ def build_faiss_index(corpus_embeddings):
     print(f"FAISS index created with {index.ntotal} vectors.")
     return index
 
-pdf_files = ["paper1.pdf", "paper2.pdf", "paper3.pdf"]
+
+# --- PDFフォルダ内の全PDFファイルを自動で取得 ---
+PDF_DIR = "pdfs"  # まとめて保存するフォルダ名
+pdf_files = glob.glob(os.path.join(PDF_DIR, "*.pdf"))
+
 all_sentences = []
 all_embeddings = []
 for pdf_path in pdf_files:
@@ -62,8 +69,12 @@ for pdf_path in pdf_files:
     all_sentences.extend(sentences)
     all_embeddings.append(corpus_embeddings)
 import torch
-all_embeddings = torch.cat(all_embeddings, dim=0)
-index = build_faiss_index(all_embeddings)
+if all_embeddings:
+    all_embeddings = torch.cat(all_embeddings, dim=0)
+    index = build_faiss_index(all_embeddings)
+else:
+    all_embeddings = None
+    index = None
 
 if __name__ == "__main__":
     print(all_sentences[:5])  # 最初の5文を表示

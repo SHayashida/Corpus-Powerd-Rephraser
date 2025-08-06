@@ -1,7 +1,7 @@
 # Corpus-Powered Rephraser
 
 ## 概要
-学術論文PDFからコーパスを自動抽出・ベクトル化し、ユーザーのドラフト文に対して意味的に近い表現を検索し、OpenAI API（GPT-4o）を用いて高品質なリライト案を生成するOSSツールです。
+学術論文PDFからコーパスを自動抽出・ベクトル化し、ユーザーのドラフト文に対して意味的に近い表現を検索し、OpenAI APIを用いて高品質なリライト案を生成するOSSツールです。
 
 - PDFテキスト抽出: PyMuPDF
 - ベクトル化: Sentence-Transformers
